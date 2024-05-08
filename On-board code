@@ -11,12 +11,12 @@ from buzzer import *
 ####################
 #### Constantes ####
 ####################
-DEPOTAGE        = True  # activation de la version avec depotage (sans trappe parachute)
-ACC_IMU         = False  # activation de l'information d'accélaration par l'IMU sinon par le contacteur mécanique
-BUZZER_ENABLE   = True  # activation du buzzer
-ACC_THESHOLD    = 1     # seuil de l'accélération pour détecter le décollage [g]
-TIMEOUT_FALLING = 7200  # temps après lequel la fusée passe en mode chute libre [ms]
-FREQ_ACQ        = 20    # Frequence d'acquisition des données [Hz]
+DEPOTAGE        = True  # Activation of the version with depowering (without parachute hatch)
+ACC_IMU         = False  # Activation of acceleration information by the IMU, otherwise by the mechanical switch
+BUZZER_ENABLE   = True  # buzzer activation 
+ACC_THESHOLD    = 1     # Acceleration threshold to detect takeoff [g]
+TIMEOUT_FALLING = 7200  #Time after which the rocket enters free fall mode [ms]
+FREQ_ACQ        = 20    # Data acquisition frequency [Hz]
 SERVO_OPEN      = 800   # [us]
 SERVO_CLOSE     = 1800  # [us]
 DEBUG           = False
@@ -25,27 +25,27 @@ SOFT_VERSION    = "1.2"
 #####################
 #### Declaration ####
 #####################
-# Declaration du bus de communication I2C
+# Declaration of the I2C communication bus
 i2c = I2C(1,freq=400000)  # default assignment: scl=Pin(7), sda=Pin(6)
 
 # Declaration des capteurs
 baro = lps22.LPS22HB(i2c)
 imu = icm20948.ICM20948(i2c_bus=i2c)
 
-# Declaration du timer
+# Timer declaration 
 timerAcq = Timer()
 
-# Declaration de l'horloge temps réel (RTC)
+# Declaration of the real-time clock (RTC
 rtc = RTC()
 
-# Declaration de la pin du parachute
+# Declaration of the parachute pin
 portePara = 0
 if DEPOTAGE is False:
     portePara = PWM(Pin(10, Pin.OUT))
     portePara.freq(50) # 50 Hz
 # portePara.calibration(700, 2400, 1510, 2500, 2000) # Min pulse, max pulse, middle pulse, 90 deg pulse, 100 speed
 
-# Declaration de la pin de l'interrupteur d'accélération
+# Declaration of the acceleration switch pin
 accPin = Pin(28, Pin.IN)
 
 # Dossier des données
@@ -67,15 +67,15 @@ saveDataFirst   = True
 ###################
 #### Fonctions ####
 ###################
-# Initialisation de la carte
+# Card Initialisation
 def InitBoard():
-    # Initialisation de la date/heure
+    # Initialization of the date/time
     rtc.datetime((2020,1,1,0,0,0,0,0))
 
-    # Ajout de la detection pour l'accelero contact 
+    # Addition of detection for the accelerometer contact
     accPin.irq(trigger=Pin.IRQ_RISING, handler=IrqAcc)
 
-    # Initialisation du timer d'acquisition
+    # Initialization of the acquisition time
     timerAcq.init(freq=FREQ_ACQ, mode=Timer.PERIODIC, callback=Sampling)
 
 def InitPlatFile():
@@ -100,7 +100,7 @@ def InitPlatFile():
     filePlatform.write(f"# Temps [s] | Pression [mBar] | temperature [°C] | acc X [g] | acc Y [g] | acc Z [g]\n")
     filePlatform.close()
 
-# Activation de l'acquisition des données
+# Activation of data acquisition
 def Sampling(timer):
     global isSampling
     #if isSampling is False:
@@ -128,98 +128,98 @@ if __name__ == '__main__':
     time.sleep(0.2)
     SetBuzzer(False)
 
-    # Ouvre la trappe parachute au démarrage si besoin
-    OuvertureParachute()
+    #Open the parachute hatch at startup if necessary
+   OpenParachute()
 
-    # Attente pour placer la trappe parachute si besoin
-    # InitMusic(BUZZER_ENABLE)
+    # Waiting to place the parachute hatch if necessary
+    # Music Init(BUZZER_ENABLE)
     time.sleep(3)
     
-    # Fermeture de la trappe parachute si besoin
-    FermetureParachute()
+    #Closing the parachute hatch if necessary
+    CloseParachute()
 
-    # Initialisation des fonctions d'acquisitions
+    # Initialization of acquisition functions
     InitBoard()
 
-    # Ouvre un fichier pour l'écriture des données
+    # Open a file for writing data
     InitPlatFile()
     dataFilePlatBuff = []
 
-    # Exécute les actions de la charge utile au démarrage de la carte
+    # Execute payload actions at board startup
     CU_Initialisation(baro, imu)
 
-    # Initialisation du temps initial
+    # Initialization of the initial time
     tempsMsDebut = time.ticks_ms()
 
-    # Fin initialisation avec son specific
+    # Initialization completed with specific sound
     SetBuzzer(BUZZER_ENABLE, freq=800, tps=0.2)
     time.sleep(0.6)
-    # Configure le buzzer pour faire un son specifique avant décollage
+    # Configure the buzzer to make a specific sound before liftoff
     SetBuzzer(BUZZER_ENABLE, freq=1000, tps=2)
 
     while True:
         if isSampling is True:
-            # Acquisition du temps actuel
+            # acquisition of the current time
             tempsAcq = time.ticks_diff(time.ticks_ms(), tempsMsDebut)/1000.0
 
-            # Acquisitions des capteurs
+            # Acquisitions from sensors
             ax, ay, az, gx, gy, gz = imu.read_accelerometer_gyro_data()
             # mx, my, mz = imu.read_magnetometer_data()
             pressure = baro.read_pressure()
             temp = baro.read_temperature()
 
-            # Si l'acceleration dépasse le seuil ou que la pin d'accélération est appuyée, et que le décollage n'est pas encore arrivé, il y a eu décollage
+            # If the acceleration exceeds the threshold or the acceleration pin is pressed, and liftoff has not yet occurred, then liftoff has occurred
             if ((ay < -1-ACC_THESHOLD and ACC_IMU is True) or (accContact is True and ACC_IMU is False)) and (isLaunched is False):
-                # Changement de status de l'indicateur de decollage
+                # Change in liftoff indicator status
                 isLaunched = True
-                # Sauvegarde du temps de décollage
+                # Save liftoff time
                 tempsDecollage = time.ticks_ms()
-                # Changement du son du buzzer
+                # Change of buzzer sound
                 SetBuzzer(BUZZER_ENABLE, freq=1500, tps=1)
                 if DEBUG is True:
-                    # Affichage sur la console
+                    # Display on the console
                     print('Decollage !')
 
-            # Si le decollage est passé et que la chute libre n'est pas encore arrivé
+            # If liftoff has occurred and free fall has not yet occurred
             if (isLaunched is True) and (isFalling is False):
-                # Si le timer de chute libre est dépassé
+                # If the free fall timer has elapsed
                 if (time.ticks_ms()-tempsDecollage > TIMEOUT_FALLING):
-                    # Ouverture de la trappe parachute si besoin 
-                    OuvertureParachute()
-                    # Changement de status de chute libre
+                    # Open parachute hatch if necessary 
+                    OpenParachute()
+                    # Change in free fall status
                     isFalling = True
-                    # Changement du son du buzzer
+                    # Change of buzzer sound
                     SetBuzzer(BUZZER_ENABLE, freq=2000, tps=0.5)
-                    # Ecriture du temps actuel du debut de la chute libre dans le fichier
+                    # Writing the current time of the beginning of free fall to the file
                     filePlatform = open(dataFolder+"data_platform.txt","a", encoding="utf-8")
                     filePlatform.write(f"# Chute libre: {tempsAcq:.3f}s\n")
                     filePlatform.close()
                     if DEBUG is True:
-                        # Affichage sur la console
+                        # Display on the console
                         print('Chute libre !')
             
-            # Mise en forme des données à écrire sur le fichier (temps, pression, température, accélération x,y,z)
+            # Formatting of the data to be written to the file (time, pressure, temperature, acceleration x, y, z)
             dataFilePlat = f"{tempsAcq:.3f} {pressure:.1f} {temp:.1f} {ax:.2f} {ay:.2f} {az:.2f}\n"
 
-            # Si le decollage n'a pas encore eu lieu
+            # If liftoff has not yet occurred
             if isLaunched is False:
-                # Garde les données sur 1/2 seconde avant le décollage
+                # Keep the data for 1/2 seconds before liftoff
                 dataFilePlatBuff.append(dataFilePlat)
                 if (len(dataFilePlatBuff) > FREQ_ACQ/2):
                     del dataFilePlatBuff[0]
 
-                # Exécute les actions de la charge utile avant décollage
+                # Execute payload actions before liftoff
                 CU_AvantDecollage(tempsAcq, baro, imu)
 
-            # Si le decollage a eu lieu
+            # If liftoff has occurred
             else:
                 if saveData is False:
-                    # Sauvegarde RAM avant écriture
+                    # Backup RAM before writing
                     dataFilePlatBuff.append(dataFilePlat)
                     if (len(dataFilePlatBuff) >= FREQ_ACQ/2):
                         saveData = True
                 elif saveData is True:
-                    # Ecriture sur le fichier de plusieurs points de mesure
+                    #Write multiple measurement points to the file
                     filePlatform = open(dataFolder+"data_platform.txt","a", encoding="utf-8")
                     for dataEl in dataFilePlatBuff:
                         filePlatform.write(dataEl)
@@ -231,19 +231,19 @@ if __name__ == '__main__':
                     filePlatform.close()
                     saveData = False
 
-                # Exécute les actions de la charge utile après décollage
+                #Execute payload actions after liftoff
                 CU_ApresDecollage(tempsAcq, baro, imu)
 
-            # Si la fusée est en chute libre
+            # If the rocket is in free fall
             if isFalling is True:
-                # Exécute les actions de la charge utile prendant la redescente
+                # Execute payload actions during descent
                 CU_Redescente(tempsAcq, baro, imu)
 
-            # Reinitialisation de l'indicateur pour le timer d'acquisition
+            # Resetting the indicator for the acquisition timer
             isSampling = False
 
             if DEBUG is True:
-                # Affichage des resultats sur la console
+                # Displaying the results on the console
                 tempsRtc = rtc.datetime()
                 print(f'\nTime:        {tempsRtc[4]:d}h{tempsRtc[5]:d}m{tempsRtc[6]:d}s / {tempsAcq:.2f}')
                 print(f'Acceleration:  X = {ax:.2f} , Y = {ay:.2f} , Z = {az:.2f}')
