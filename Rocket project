@@ -1,0 +1,47 @@
+# Rocket project
+# Buzzer management
+import time
+from machine import Pin,PWM,Timer
+
+# Declaration of a PWM for the buzzer
+buzzer = PWM(Pin(18))
+
+# Timer declaration for the buzzer and its deactivation
+timerBuzzer = Timer()
+timerOffBuzzer = Timer()
+
+# Variables for the buzzer
+freqBuzzer  = 500
+tempsBuzzer = 0
+# Music initialization
+def InitMusic(enable=True):
+    notes = (146.83,164.81,174.61,164.81,130.81,146.83,164.81,174.61,164.81,196.00,155.56,174.61,196.00,155.56,146.83,138.59,164.81)
+    notes = tuple(x*2 for x in notes) # Augmente d'une octave la musique
+    tempsNotes = (1.5,0.5,0.5,0.5,1,1.5,0.5,0.5,0.5,1,1.5,0.5,1,1,1,2,2)
+    bpm = 75
+    if enable is True:
+        buzzer.duty_u16(0) # Set to 0%
+        buzzer.duty_u16(32768) # Set to 50%
+        for iNote in range(0, len(notes)):
+            buzzer.freq(round(notes[iNote]))
+            time.sleep((60.0/bpm)*tempsNotes[iNote])
+
+    buzzer.duty_u16(0) # Set to 0%
+
+# Management buzzer
+def MgtBuzzer(timer):
+    buzzer.freq(freqBuzzer)
+    buzzer.duty_u16(32768) # Set to 50%
+    timerOffBuzzer.init(freq=1.0/0.1, mode=Timer.ONE_SHOT, callback=SetOffBuzzer) # Ring the buzzer for this time (0.1s)
+
+def SetOffBuzzer(timer):
+    buzzer.duty_u16(0) # Set to 0%
+
+# Turn on the buzzer for the specified frequency and period
+def SetBuzzer(enable=True, freq=500, tps=5.0):
+    """Set the buzzer with a frequency and a time between ring"""
+    global freqBuzzer
+    freqBuzzer = freq
+    timerBuzzer.deinit()
+    if enable is True:
+        timerBuzzer.init(freq=1.0/tps, mode=Timer.PERIODIC, callback=MgtBuzzer)
